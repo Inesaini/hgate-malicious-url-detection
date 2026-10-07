@@ -1,5 +1,7 @@
 # H-GATE — Malicious URL Detection
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Inesaini/hgate-malicious-url-detection/blob/main/HGATE_Malicious_URL_Detection.ipynb)
+
 **H**arris-Hawks-Optimized **G**radient-boosted **A**ttention-**T**ransformer **E**nsemble: a
 hybrid stacking model that classifies URLs into five classes (benign, defacement, malware,
 phishing, spam) on the ISCX-URL2016 dataset.
@@ -28,9 +30,49 @@ Per-class results for H-GATE:
 | Phishing | 0.9609 | 0.9773 | 0.9690 | 1.04% |
 | Spam | 0.9953 | 0.9891 | 0.9922 | 0.10% |
 
-Phishing is the hardest class: its URLs are built to look legitimate.
+Phishing is the hardest class: its URLs are built to look legitimate. Most of the remaining
+errors are other classes predicted as phishing, as the confusion matrix shows.
+
+<p align="center">
+  <img src="figures/confusion_matrix.png" width="49%" alt="H-GATE confusion matrix">
+  <img src="figures/roc_curves.png" width="49%" alt="H-GATE ROC curves">
+</p>
+
+Decision thresholds found by the per-class tuning step:
+
+| Defacement | Benign | Malware | Phishing | Spam |
+|---|---|---|---|---|
+| 0.35 | 0.70 | 0.60 | 0.25 | 0.45 |
+
+The benign threshold is the highest, so a URL is only flagged as benign when the model is
+confident about it.
+
+### Comparison with plain gradient boosting
+
+Under the same 5-fold protocol, H-GATE gains 0.16 points of accuracy over plain XGBoost and
+lowers the macro FPR from 0.41% to 0.37%. The gain is small. The Harris Hawks search ran with
+the `fast` profile (see [Run it](#run-it)), and the tuned XGBoost of the
+[baseline study](https://github.com/Inesaini/malicious-url-detection-ml-dl) reaches 98.60%
+accuracy and 0.35% FPR on a single 80/20 split. The two protocols differ (one test split
+against out-of-fold predictions on the whole dataset), so the numbers are not directly
+comparable. Still, most of the performance on these lexical features already comes from
+gradient boosting, and a longer HHO search is the obvious next step.
 
 ## How it works
+
+```mermaid
+flowchart LR
+    A[ISCX-URL2016<br/>79 lexical features] --> B[Imputation +<br/>feature engineering]
+    B --> C[Stratified 5-fold CV<br/>SMOTE-NC per fold]
+    C --> D1[FT-Transformer]
+    C --> D2[LightGBM<br/>focal loss]
+    C --> D3[XGBoost]
+    C --> D4[CatBoost]
+    D1 & D2 & D3 & D4 --> E[Logistic<br/>meta-learner]
+    E --> F[Per-class<br/>thresholds]
+    F --> G[Prediction]
+    H[Harris Hawks<br/>Optimization] -.tunes.-> D1 & D2 & D3 & D4
+```
 
 1. **Preprocessing** — infinities replaced, iterative (MissForest-style) imputation, binary
    missingness indicators for the most incomplete columns, and engineered interaction
@@ -56,6 +98,7 @@ Phishing is the hardest class: its URLs are built to look legitimate.
 | File | Description |
 |---|---|
 | `HGATE_Malicious_URL_Detection.ipynb` | The full notebook, with outputs and figures |
+| `figures/` | Figures used in this README, exported from the notebook |
 | `requirements.txt` | Python dependencies |
 
 ## Dataset
@@ -64,6 +107,11 @@ Phishing is the hardest class: its URLs are built to look legitimate.
 Cybersecurity. The notebook uses `All.csv`, which contains 79 pre-extracted lexical features
 per URL and a class label. The dataset is not included in this repository; download it from
 the link above.
+
+The five classes are fairly balanced (6,698 to 7,930 URLs each). A few columns have many
+missing values, which is why the preprocessing adds missingness indicators.
+
+![Class distribution and missing values](figures/class_distribution.png)
 
 ## Run it
 
@@ -80,7 +128,9 @@ jupyter notebook HGATE_Malicious_URL_Detection.ipynb
 ```
 
 The Harris Hawks search is the slowest step; intermediate results are cached with `joblib`
-so later runs reuse them.
+so later runs reuse them. Its budget is set by `HHO_PROFILE` (`fast`, `medium` or `full`).
+The results above come from the `fast` profile (15% of the data, 3 hawks, 2 iterations), so
+a larger search may improve them.
 
 ## Tech stack
 
@@ -91,7 +141,6 @@ NumPy, Matplotlib, Seaborn.
 
 Mini project for the **Data Security** (Sécurité des Données) module, 2SC IASD, École
 Supérieure en Informatique de Sidi Bel Abbès (2025/2026).
-
 
 A baseline study using classical ML and deep learning models on the same dataset is in
 [malicious-url-detection-ml-dl](https://github.com/Inesaini/malicious-url-detection-ml-dl).
