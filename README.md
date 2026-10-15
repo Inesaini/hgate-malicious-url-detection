@@ -20,7 +20,8 @@ H-GATE (**H**arris-Hawks-optimized **G**radient-boosted **A**ttention-**T**ransf
 5-fold out-of-fold evaluation on 36,707 URLs:
 
 ```mermaid
-xychart-beta
+%%{init: {"themeVariables": {"xyChart": {"plotColorPalette": "#2f6fdf"}}}}%%
+xychart-beta horizontal
     title "False Positive Rate, macro (%) - lower is better"
     x-axis ["Logistic Regression", "Random Forest", "XGBoost", "H-GATE"]
     y-axis "FPR (%)" 0 --> 4
