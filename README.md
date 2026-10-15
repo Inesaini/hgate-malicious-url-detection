@@ -1,17 +1,31 @@
-# H-GATE — Malicious URL Detection
+# H-GATE: Malicious URL Detection
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Inesaini/hgate-malicious-url-detection/blob/main/HGATE_Malicious_URL_Detection.ipynb)
 
-**H**arris-Hawks-Optimized **G**radient-boosted **A**ttention-**T**ransformer **E**nsemble: a
-hybrid stacking model that classifies URLs into five classes (benign, defacement, malware,
-phishing, spam) on the ISCX-URL2016 dataset.
+**Classify a URL as benign, defacement, malware, phishing or spam with 98.5% accuracy, while raising a false alarm on only 0.37% of URLs.**
 
-The goal is twofold: maximize accuracy and push the False Positive Rate as low as possible,
-since in a security setting every false alarm blocks a legitimate site.
+H-GATE (**H**arris-Hawks-optimized **G**radient-boosted **A**ttention-**T**ransformer **E**nsemble) is a stacking ensemble on the ISCX-URL2016 dataset. In security, every false alarm blocks a legitimate site, so the model is tuned for a low False Positive Rate (FPR), not just accuracy.
+
+## Highlights
+
+- **Four very different models stacked:** an FT-Transformer (attention over tabular features), LightGBM with a custom focal loss, XGBoost and CatBoost, combined by a logistic meta-learner.
+- **Metaheuristic tuning:** Harris Hawks Optimization searches all hyperparameters jointly, with a fitness function that penalizes false positives.
+- **Leak-free evaluation:** 5-fold out-of-fold predictions on 36,707 URLs, with SMOTE-NC oversampling inside each training fold only.
+- **Explained:** per-class decision thresholds and a SHAP analysis of what drives the decisions.
+
+**Stack:** Python · PyTorch · LightGBM · XGBoost · CatBoost · scikit-learn · imbalanced-learn · SHAP
 
 ## Results
 
 5-fold out-of-fold evaluation on 36,707 URLs:
+
+```mermaid
+xychart-beta
+    title "False Positive Rate, macro (%) - lower is better"
+    x-axis ["Logistic Regression", "Random Forest", "XGBoost", "H-GATE"]
+    y-axis "FPR (%)" 0 --> 4
+    bar [3.64, 0.59, 0.41, 0.37]
+```
 
 | Model | Accuracy | Macro F1 | Macro FPR | Macro AUC |
 |---|---|---|---|---|
@@ -47,16 +61,9 @@ Decision thresholds found by the per-class tuning step:
 The benign threshold is the highest, so a URL is only flagged as benign when the model is
 confident about it.
 
-### Comparison with plain gradient boosting
+### Honest take
 
-Under the same 5-fold protocol, H-GATE gains 0.16 points of accuracy over plain XGBoost and
-lowers the macro FPR from 0.41% to 0.37%. The gain is small. The Harris Hawks search ran with
-the `fast` profile (see [Run it](#run-it)), and the tuned XGBoost of the
-[baseline study](https://github.com/Inesaini/malicious-url-detection-ml-dl) reaches 98.60%
-accuracy and 0.35% FPR on a single 80/20 split. The two protocols differ (one test split
-against out-of-fold predictions on the whole dataset), so the numbers are not directly
-comparable. Still, most of the performance on these lexical features already comes from
-gradient boosting, and a longer HHO search is the obvious next step.
+H-GATE beats plain XGBoost by 0.16 points of accuracy and cuts the FPR from 0.41% to 0.37%: a real but small gain. Most of the performance on these lexical features already comes from gradient boosting, and the Harris Hawks search ran on its `fast` budget (15% of the data, 3 hawks, 2 iterations), so a longer search is the obvious next step. The tuned XGBoost from the [baseline study](https://github.com/Inesaini/malicious-url-detection-ml-dl) reaches 98.60% on a single 80/20 split, which isn't directly comparable to out-of-fold results.
 
 ## How it works
 
@@ -74,7 +81,7 @@ flowchart LR
     H[Harris Hawks<br/>Optimization] -.tunes.-> D1 & D2 & D3 & D4
 ```
 
-1. **Preprocessing** — infinities replaced, iterative (MissForest-style) imputation, binary
+1. **Preprocessing:** infinities replaced, iterative (MissForest-style) imputation, binary
    missingness indicators for the most incomplete columns, and engineered interaction
    features.
 2. **Stratified 5-fold cross-validation** with SMOTE-NC applied inside each fold only, so no
@@ -131,11 +138,6 @@ The Harris Hawks search is the slowest step; intermediate results are cached wit
 so later runs reuse them. Its budget is set by `HHO_PROFILE` (`fast`, `medium` or `full`).
 The results above come from the `fast` profile (15% of the data, 3 hawks, 2 iterations), so
 a larger search may improve them.
-
-## Tech stack
-
-Python, PyTorch, LightGBM, XGBoost, CatBoost, scikit-learn, imbalanced-learn, SHAP, pandas,
-NumPy, Matplotlib, Seaborn.
 
 ## About the project
 
